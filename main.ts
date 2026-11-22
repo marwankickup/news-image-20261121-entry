@@ -14,10 +14,30 @@
 //
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 
-import { copyFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const poster = new URL("entry.png", import.meta.url);
 const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? "/output";
 
+// Validate the poster before copying: it must exist, be a real PNG, and be
+// exactly 1024x1024, the size the bounty requires. Fail loudly instead of
+// handing the grader a broken or wrong-sized file.
+if (!existsSync(poster)) {
+  throw new Error(`poster not found: ${poster}`);
+}
+const head = readFileSync(poster).subarray(0, 33);
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+if (!head.subarray(0, 8).equals(PNG_MAGIC) || head.toString("ascii", 12, 16) !== "IHDR") {
+  throw new Error("entry.png is not a valid PNG file");
+}
+const width = head.readUInt32BE(16);
+const height = head.readUInt32BE(20);
+if (width !== 1024 || height !== 1024) {
+  throw new Error(`entry.png must be 1024x1024, got ${width}x${height}`);
+}
+
+mkdirSync(outDir, { recursive: true });
 copyFileSync(poster, join(outDir, "entry.png"));
+const bytes = statSync(poster).size;
+console.log(`entry.png: ${bytes} bytes, ${width}x${height}, copied to ${join(outDir, "entry.png")}`);

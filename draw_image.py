@@ -239,6 +239,7 @@ def main():
     pw = (1024 - 60 - gx) // 2
     ph = (980 - py0 - 2 * gy) // 3
     kick_f, head_f, sub_f = F(SANS_B, 18), F(SANS_B, 30), F(SANS, 21)
+    worst = 0  # deepest panel text bottom, in design units from panel top
     for i, (kicker, accent, icon, head, sub) in enumerate(STORIES):
         cx0 = px0 + (i % 2) * (pw + gx)
         cy0 = py0 + (i // 2) * (ph + gy)
@@ -251,11 +252,18 @@ def main():
         y = cy0 + 116
         for line in wrap(d, head, head_f, X(pw - 36)):
             centered(d, X(ccx), X(y), line, head_f, INK)
-            y += 38
-        y += 3
+            y += 36
+        y += 4
         for line in wrap(d, sub, sub_f, X(pw - 44)):
             centered(d, X(ccx), X(y), line, sub_f, (60, 60, 66))
-            y += 26
+            y += 24
+        # Keep the text block clear of the panel edge: with the old leading
+        # the deepest panel ended 6px above the border; the tighter leading
+        # below leaves ~16px of air. Fail loudly if a panel ever overflows.
+        text_bottom = y - 3
+        worst = max(worst, text_bottom - cy0)
+        if text_bottom > cy0 + ph - 12:
+            raise SystemExit(f"panel {i} text overflows: bottom {text_bottom - cy0} of {ph}")
 
     # footer
     d.rectangle([X(30), X(988), X(994), X(991)], fill=RULE)
@@ -264,6 +272,7 @@ def main():
              F(SANS_B, 14), GREY, tracking=1)
 
     img = img.resize((W, W), Image.LANCZOS)
+    print("deepest panel text bottom:", worst, "of panel height", ph)
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "entry.png")
     img.save(out, optimize=True)
     print("wrote", out, os.path.getsize(out), "bytes")
